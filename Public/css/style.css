@@ -181,17 +181,38 @@ main {
 /* Hero */
 .hero {
   height: calc(100vh - 80px);
-  background: url('https://images.unsplash.com/photo-1620054813580-0081d4a0fc7c?q=80&w=2070') center/cover no-repeat;
+  background: url('/images/varanasi_bg.png') center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   padding: 0 10%;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, transparent 0%, rgba(15, 23, 42, 0.8) 100%);
+  pointer-events: none;
 }
 
 .hero-content {
   max-width: 600px;
   padding: 3rem;
   border-radius: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.glow-btn {
+  transition: all 0.4s ease;
+}
+
+.glow-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.8);
 }
 
 .badge {
@@ -211,7 +232,7 @@ main {
 }
 
 .hero-content p {
-  color: var(--text-muted);
+  color: var(--text-light);
   font-size: 1.1rem;
   margin-bottom: 2rem;
   line-height: 1.6;
@@ -234,6 +255,29 @@ main {
 }
 
 /* Product Grid */
+#shop {
+  position: relative;
+  border-radius: 20px;
+  padding: 2rem;
+  background: url('/images/mahadev_bg.png') center/cover no-repeat fixed;
+  box-shadow: inset 0 0 100px rgba(15, 23, 42, 0.9);
+}
+
+#shop::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.85); /* Dark overlay to keep products visible */
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#shop > * {
+  position: relative;
+  z-index: 1;
+}
+
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -247,6 +291,9 @@ main {
   transition: transform 0.3s ease;
   display: flex;
   flex-direction: column;
+  background: rgba(15, 23, 42, 0.6); /* Slightly more opaque for contrast against Mahadev */
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
 }
 
 .product-card:hover {
@@ -460,4 +507,48 @@ footer {
   text-align: center;
   border-top: 1px solid var(--glass-border);
   margin-top: 4rem;
+}
+
+/* Homepage Mahadev Banner */
+.mahadev-home-banner {
+  width: 100%;
+  height: 300px;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.mahadev-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+  transition: transform 1s ease;
+}
+
+.mahadev-home-banner:hover .mahadev-banner-img {
+  transform: scale(1.1);
+}
+
+.banner-text {
+  position: absolute;
+  text-align: center;
+  z-index: 2;
+}
+
+.banner-text h3 {
+  font-size: 2.5rem;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.8);
+}
+
+.banner-text p {
+  font-size: 1.1rem;
+  color: white;
+  font-style: italic;
 }

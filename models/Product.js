@@ -8,7 +8,11 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true, default: 0 },
   countInStock: { type: Number, required: true, default: 0 },
   rating: { type: Number, required: true, default: 0 },
-  numReviews: { type: Number, required: true, default: 0 }
+  numReviews: { type: Number, required: true, default: 0 },
+  popularityScore: { type: Number, default: 0 },
+  relatedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Blog' }],
+  howToWear: { type: String, default: '' },
+  benefit: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Product', productSchema);

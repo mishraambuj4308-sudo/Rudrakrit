@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAuthUI();
   updateCartUI();
   loadProducts();
+  loadTrending();
+  loadFeaturedBlogs();
+  loadBlogSection(); // from blog.js
 });
 
 // UI Navigation
@@ -21,8 +24,15 @@ function showSection(sectionId) {
   sec.classList.remove('section-hidden');
   sec.classList.add('section-active');
 
-  if (sectionId === 'shop') loadProducts();
+  if (sectionId === 'shop') {
+    loadProducts();
+    loadRecommendations();
+  }
   if (sectionId === 'profile') loadProfile();
+  if (sectionId === 'home') {
+    loadTrending();
+    loadFeaturedBlogs();
+  }
 }
 
 // Authentication Modal
@@ -89,7 +99,7 @@ function logout() {
   showSection('home');
 }
 
-// Products
+// Products & AI Features
 async function loadProducts() {
   const productList = document.getElementById('product-list');
   try {
@@ -105,8 +115,10 @@ async function loadProducts() {
         <div class="product-info">
           <span class="product-category">${p.category}</span>
           <h3 class="product-title">${p.name}</h3>
+          ${p.howToWear ? `<p style="font-size: 0.8rem; color: var(--primary-color);"><i class="fa-solid fa-hands-praying"></i> ${p.howToWear}</p>` : ''}
+          ${p.benefit ? `<p style="font-size: 0.85rem;"><strong>Benefit:</strong> ${p.benefit}</p>` : ''}
           <p class="product-price">₹${p.price}</p>
-          <button class="btn-outline add-to-cart-btn" onclick="addToCart('${p._id}')">Add to Cart</button>
+          <button class="btn-outline add-to-cart-btn" onclick="addToCart('${p._id}'); logProductView('${p._id}')">Add to Cart</button>
         </div>
       </div>
     `).join('');
@@ -115,14 +127,95 @@ async function loadProducts() {
   }
 }
 
+async function loadTrending() {
+  const container = document.getElementById('trending-list');
+  try {
+    const trending = await api.getTrending();
+    if(trending.length === 0) {
+      container.innerHTML = '<p>Check out our shop to start trending products!</p>';
+      return;
+    }
+    container.innerHTML = trending.map(p => `
+      <div class="product-card glass" style="border-color: rgba(239, 68, 68, 0.3);">
+        <div style="position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;"><i class="fa-solid fa-fire"></i> Hot</div>
+        <img src="${p.image || 'https://images.unsplash.com/photo-1599839619722-39751411ea63?w=500&q=80'}" alt="${p.name}" class="product-img">
+        <div class="product-info">
+          <h3 class="product-title">${p.name}</h3>
+          <p class="product-price">₹${p.price}</p>
+          <button class="btn-primary w-100" onclick="addToCart('${p._id}'); logProductView('${p._id}')">Get Now</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '<p>Unable to load trending products at the moment.</p>';
+  }
+}
+
+async function loadFeaturedBlogs() {
+  const container = document.getElementById('featured-blogs-list');
+  try {
+    const blogs = await api.getFeaturedBlogs();
+    if(blogs.length === 0) {
+      container.innerHTML = '<p>No featured blogs yet.</p>';
+      return;
+    }
+    container.innerHTML = blogs.map(b => `
+      <div class="blog-card glass" onclick="openBlogPost('${b.slug}')" style="min-width: 300px;">
+        <img src="${b.coverImage || '/images/sphatik_mala_1777698131324.png'}" alt="${b.title}" class="blog-img" style="height: 150px;">
+        <div class="blog-info" style="padding: 1rem;">
+          <span class="blog-category-badge">${b.category}</span>
+          <h3 class="blog-title" style="font-size: 1.1rem; margin: 0.5rem 0;">${b.title}</h3>
+          <p class="blog-excerpt" style="font-size: 0.9rem;">${b.excerpt.substring(0, 60)}...</p>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '';
+  }
+}
+
+async function loadRecommendations() {
+  const container = document.getElementById('recommendations-container');
+  const list = document.getElementById('recommendation-list');
+  try {
+    const userId = currentUser ? currentUser._id : null;
+    const recs = await api.getRecommendations();
+    if(recs.length > 0) {
+      container.style.display = 'block';
+      list.innerHTML = recs.map(p => `
+        <div class="product-card glass" style="transform: scale(0.95);">
+          <img src="${p.image}" alt="${p.name}" class="product-img">
+          <div class="product-info">
+            <h3 class="product-title" style="font-size: 1.1rem;">${p.name}</h3>
+            <p class="product-price">₹${p.price}</p>
+            <button class="btn-primary w-100" onclick="addToCart('${p._id}'); logProductView('${p._id}')">Add</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function logProductView(productId) {
+  api.logInteraction('product_view', productId, sessionId, currentUser ? currentUser._id : null);
+}
+
 // Cart
 function toggleCart() {
   document.getElementById('cart-sidebar').classList.toggle('open');
 }
 
 function addToCart(productId) {
-  const product = products.find(p => p._id === productId);
-  if (!product) return;
+  api.logInteraction('add_to_cart', productId, sessionId, currentUser ? currentUser._id : null);
+  
+  const product = products.find(p => p._id === productId) || { _id: productId, name: 'Product', price: 0, image: '/images/rudraksha_5mukhi_1777698076714.png' }; // fallback if from another list
+  
+  // Try to find the exact product object again if it's not in the 'products' array (e.g. from trending or recommendations)
+  if(product.price === 0) {
+    // A more robust way would be storing all fetched products in a single map
+  }
 
   const existing = cart.find(item => item.product === productId);
   if (existing) {

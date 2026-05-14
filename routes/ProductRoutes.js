@@ -45,6 +45,11 @@ router.post('/', protect, admin, async (req, res) => {
     });
 
     const createdProduct = await product.save();
+    
+    // Notify feedback agent
+    const feedbackAgent = require('../agents/feedbackAgent');
+    feedbackAgent.onProductUpdate(createdProduct._id);
+    
     res.status(201).json(createdProduct);
   } catch (error) {
     res.status(500).json({ message: error.message });
