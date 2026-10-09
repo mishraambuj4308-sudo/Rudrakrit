@@ -12,29 +12,41 @@ permissions:
 jobs:
   deploy:
     runs-on: self-hosted
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Deploy backend
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+
           APP_DIR="$HOME/apps/Rudrakrit"
+
+          echo "Creating application directory..."
           mkdir -p "$APP_DIR"
+
+          echo "Copying application files..."
           rsync -a --delete \
             --exclude='.git/' \
             --exclude='node_modules/' \
             --exclude='.env' \
             ./ "$APP_DIR/"
+
           cd "$APP_DIR"
+
+          echo "Installing production dependencies..."
           npm ci --omit=dev
+
+          echo "Deploying with PM2..."
           if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
             pm2 restart rudrakrit-backend --update-env
           else
             pm2 start server.js --name rudrakrit-backend
           fi
+
+          echo "Saving PM2 process list..."
           pm2 save
+
+          echo "Deployment completed successfully!"
