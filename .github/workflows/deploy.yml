@@ -1,52 +1,48 @@
 name: Deploy Rudrakrit Backend
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+push:
+branches:
+- main
+workflow_dispatch:
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  deploy:
-    runs-on: self-hosted
+deploy:
+runs-on: self-hosted
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+```
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Deploy backend
-        shell: bash
-        run: |
-          set -euo pipefail
+  - name: Install dependencies
+    run: npm ci
 
-          APP_DIR="$HOME/apps/Rudrakrit"
+  - name: Deploy backend
+    shell: bash
+    run: |
+      set -e
 
-          echo "Creating application directory..."
-          mkdir -p "$APP_DIR"
+      APP_DIR="$HOME/apps/Rudrakrit"
+      mkdir -p "$APP_DIR"
 
-          echo "Copying application files..."
-          rsync -a --delete \
-            --exclude='.git/' \
-            --exclude='node_modules/' \
-            --exclude='.env' \
-            ./ "$APP_DIR/"
+      rsync -a --delete \
+        --exclude='.git/' \
+        --exclude='node_modules/' \
+        --exclude='.env' \
+        ./ "$APP_DIR/"
 
-          cd "$APP_DIR"
+      cd "$APP_DIR"
+      npm ci --omit=dev
 
-          echo "Installing production dependencies..."
-          npm ci --omit=dev
+      if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
+        pm2 restart rudrakrit-backend --update-env
+      else
+        pm2 start server.js --name rudrakrit-backend
+      fi
 
-          echo "Deploying with PM2..."
-          if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
-            pm2 restart rudrakrit-backend --update-env
-          else
-            pm2 start server.js --name rudrakrit-backend
-          fi
-
-          echo "Saving PM2 process list..."
-          pm2 save
-
-          echo "Deployment completed successfully!"
+      pm2 save
+```
