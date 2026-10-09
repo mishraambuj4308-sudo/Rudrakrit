@@ -1,7 +1,10 @@
+name: Deploy Rudrakrit Backend
 
-name: Rudrakrit Backend Deploy
-
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -9,15 +12,40 @@ permissions:
 jobs:
   deploy:
     runs-on: self-hosted
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Check project
+        run: |
+          node -v
+          npm -v
+          test -f package.json
+          test -f package-lock.json
+          test -f server.js
 
       - name: Deploy backend
         shell: bash
         run: |
           set -e
-          echo "Runner is working"
-          node -v
-          npm -v
-          git status --short
+
+          APP_DIR="$HOME/apps/Rudrakrit"
+          mkdir -p "$APP_DIR"
+
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.env' \
+            ./ "$APP_DIR/"
+
+          cd "$APP_DIR"
+          npm ci --omit=dev
+
+          if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
+            pm2 restart rudrakrit-backend --update-env
+          else
+            pm2 start server.js --name rudrakrit-backend
+          fi
+
+          pm2 save
