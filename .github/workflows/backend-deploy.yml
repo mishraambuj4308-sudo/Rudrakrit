@@ -1,0 +1,71 @@
+
+name: Deploy Rudrakrit Backend
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "server.js"
+      - "package.json"
+      - "package-lock.json"
+      - "routes/**"
+      - "models/**"
+      - "agents/**"
+      - "middleware/**"
+      - "config/**"
+      - ".github/workflows/backend-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare backend files
+        run: |
+          mkdir -p deploy
+          cp package.json server.js deploy/
+          [ ! -f package-lock.json ] || cp package-lock.json deploy/
+          for dir in routes models agents middleware config; do
+            [ ! -d "$dir" ] || cp -r "$dir" deploy/
+          done
+          tar -czf backend.tar.gz -C deploy .
+
+      - name: Upload backend to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "backend.tar.gz"
+          target: "/home/${{ secrets.SSH_USER }}/"
+
+      - name: Install dependencies and restart backend
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            sudo mkdir -p /var/www/rudrakrit-backend
+            sudo chown -R $USER:$USER /var/www/rudrakrit-backend
+
+            tar -xzf "$HOME/backend.tar.gz" -C /var/www/rudrakrit-backend
+            rm -f "$HOME/backend.tar.gz"
+
+            cd /var/www/rudrakrit-backend
+            npm install --omit=dev
+
+            if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
+              pm2 restart rudrakrit-backend --update-env
+            else
+              pm2 start server.js --name rudrakrit-backend
+            fi
+
+            pm2 save
