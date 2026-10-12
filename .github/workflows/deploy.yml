@@ -1,9 +1,20 @@
+
 name: Deploy Rudrakrit Backend
 
 on:
   push:
     branches:
       - master
+    paths:
+      - "server.js"
+      - "package.json"
+      - "package-lock.json"
+      - "routes/**"
+      - "models/**"
+      - "agents/**"
+      - "middleware/**"
+      - "config/**"
+      - ".github/workflows/backend-deploy.yml"
   workflow_dispatch:
 
 permissions:
@@ -17,35 +28,64 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check project
-        run: |
-          node -v
-          npm -v
-          test -f package.json
-          test -f package-lock.json
-          test -f server.js
-
-      - name: Deploy backend
-        shell: bash
+      - name: Prepare backend package
         run: |
           set -e
+          test -f package.json
+          test -f server.js
 
-          APP_DIR="$HOME/apps/Rudrakrit"
-          mkdir -p "$APP_DIR"
+          mkdir deploy
+          cp package.json server.js deploy/
 
-          rsync -a --delete \
-            --exclude='.git/' \
-            --exclude='node_modules/' \
-            --exclude='.env' \
-            ./ "$APP_DIR/"
-
-          cd "$APP_DIR"
-          npm ci --omit=dev
-
-          if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
-            pm2 restart rudrakrit-backend --update-env
-          else
-            pm2 start server.js --name rudrakrit-backend
+          if [ -f package-lock.json ]; then
+            cp package-lock.json deploy/
           fi
 
-          pm2 save
+          for dir in routes models agents middleware config; do
+            if [ -d "$dir" ]; then
+              cp -r "$dir" deploy/
+            fi
+          done
+
+          tar -czf backend.tar.gz -C deploy .
+
+      - name: Upload backend to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "backend.tar.gz"
+          target: "/home/${{ secrets.SSH_USER }}/"
+
+      - name: Install dependencies and restart backend
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            APP_DIR="/var/www/rudrakrit-backend"
+
+            sudo mkdir -p "$APP_DIR"
+            sudo chown "$USER":"$USER" "$APP_DIR"
+
+            tar -xzf "$HOME/backend.tar.gz" -C "$APP_DIR"
+            rm -f "$HOME/backend.tar.gz"
+
+            cd "$APP_DIR"
+            npm install --omit=dev
+
+            if ! command -v pm2 >/dev/null 2>&1; then
+              sudo npm install -g pm2
+            fi
+
+            if pm2 describe rudrakrit-backend >/dev/null 2>&1; then
+              pm2 restart rudrakrit-backend --update-env
+            else
+              pm2 start server.js --name rudrakrit-backend
+            fi
+
+            pm2 save
